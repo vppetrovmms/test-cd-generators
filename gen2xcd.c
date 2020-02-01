@@ -23,6 +23,12 @@
 #define CD_WARN "WARN: "
 
 typedef struct {
+  size_t m;
+  size_t s;
+  size_t f;
+} trk_index_t;
+
+typedef struct {
   uint16_t l;
   uint16_t r;
 } sample_16_t;
@@ -49,6 +55,7 @@ static const size_t pregap_size_A = 75U; // 1s pregap for 1st track
 static const size_t tracks_num = 16U;
 static const char *performer = "Tone generator";
 
+trk_index_t calculate_index(const size_t offset);
 int generate_image(const char *base_name);
 int write_header(FILE *toc);
 int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname);
@@ -67,6 +74,28 @@ int main (int argc, char **argv)
     fprintf(stderr, "Incorrect arg.\nUsage: %s outbasename\n\n", argv[0]);
     ret = -1;
   }
+
+  return ret;
+}
+
+trk_index_t calculate_index(const size_t offset_s)
+{
+  trk_index_t ret;
+
+  const size_t offset = offset_s / frame_size;
+  const size_t deviation = offset_s % frame_size;
+
+  if (deviation)
+  {
+    fprintf(stderr, "Calculated index deviation %lld\n", (long long int)deviation);
+  }
+
+  const size_t div_m = 4500U;
+  const size_t div_s = 75U;
+
+  ret.m = offset / div_m;
+  ret.s = (offset % div_m) / div_s;
+  ret.f = (offset % div_m % div_s);
 
   return ret;
 }
@@ -139,7 +168,7 @@ int write_header(FILE *toc)
     "CD_DA\n"
     "CD_TEXT {\n"
     "  LANGUAGE_MAP {\n"
-    "    0 : EN\n"
+    "    0: 9\n"
     "  }\n"
     "  LANGUAGE 0 {\n"
     "    TITLE \"%s\"\n"
@@ -301,7 +330,8 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     snprintf(title, sizeof(title), "Tone %21.15f Hz (0 dB)", freq);
     snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
 
-    snprintf(pregap_line, sizeof(pregap_line), "START %d\n", (int)pregap);
+    trk_index_t pre = calculate_index(pregap);
+    snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
 
     int pr_ret = fprintf(toc,
       "// Track %d\n"
@@ -309,21 +339,21 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       "COPY\n"
       "NO PRE_EMPHASIS\n"
       "TWO_CHANNEL_AUDIO\n"
-      "FILE \"%s\" %d %d\n"
-      "%s"
       "CD_TEXT {\n"
       "  LANGUAGE 0 {\n"
       "    TITLE \"%s\"\n"
       "    PERFORMER \"%s\"\n"
       "    MESSAGE \"%s\"\n"
       "  }\n"
-      "}\n\n",
+      "}\n"
+      "FILE \"%s\" %d %d\n"
+      "%s\n",
       trk_i,
-      dataname, (int)begin_pregap, (int)track_length,
-      pregap ? pregap_line : "",
       title,
       performer,
-      message
+      message,
+      dataname, (int)begin_pregap, (int)track_length,
+      pregap ? pregap_line : ""
       );
     if (0 > pr_ret) {
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
@@ -372,10 +402,11 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
 
       for (size_t si = 0; si < silence_strip_count_A; si++)
       {
-        size_t index_pos = *pos - begin_pos;
+        const size_t index_pos = *pos - begin_pos;
+        trk_index_t idx = calculate_index(index_pos);
         if (0U < index_pos) {
           char index[100];
-          snprintf(index, sizeof(index), "INDEX %d\n", (int)index_pos);
+          snprintf(index, sizeof(index), "INDEX %02d:%02d:%02d\n", (int)(idx.m), (int)(idx.s), (int)(idx.f));
           index_entries = realloc(index_entries, strlen(index_entries) + strlen(index) + 1U);
           if (index_entries)
           {
@@ -460,21 +491,21 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
       "COPY\n"
       "NO PRE_EMPHASIS\n"
       "TWO_CHANNEL_AUDIO\n"
-      "FILE \"%s\" %d %d\n"
-      "%s"
       "CD_TEXT {\n"
       "  LANGUAGE 0 {\n"
       "    TITLE \"%s\"\n"
       "    PERFORMER \"%s\"\n"
       "    MESSAGE \"%s\"\n"
       "  }\n"
-      "}\n\n",
+      "}\n"
+      "FILE \"%s\" %d %d\n"
+      "%s\n",
       trk_i,
-      dataname, (int)begin_pos, (int)track_length,
-      index_entries,
       title,
       performer,
-      message
+      message,
+      dataname, (int)begin_pos, (int)track_length,
+      index_entries
       );
     if (0 > pr_ret) {
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
