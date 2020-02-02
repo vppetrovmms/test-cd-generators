@@ -269,9 +269,9 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
           fprintf(stderr, CD_WARN "Values are not symmetrical to neutral level 0.5: i=%d val1=%5d val2=%5d\n", (int)i, val1, val2);
         }
 
-        sam[i].s.l = val1;
+        sam[i].s.l = (uint16_t)val1;
         sam[i+halflen].s.l = (uint16_t)val2;
-        sam[i].s.r = val1;
+        sam[i].s.r = (uint16_t)val1;
         sam[i+halflen].s.r = (uint16_t)val2;
 
         radpos += (M_PI / halflen);
