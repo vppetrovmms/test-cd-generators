@@ -171,6 +171,7 @@ int write_header(FILE *toc)
 
   int pr_ret = fprintf(toc,
     "CD_DA\n"
+    "\n"
     "CD_TEXT {\n"
     "  LANGUAGE_MAP {\n"
     "    0: 9\n"
@@ -206,6 +207,9 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
   const int begin_frame = begin_pos / frame_size;
   const size_t end = begin_pos + (track_size_A * frame_size);
   const size_t track_length = end - begin_pregap;
+
+  const trk_index_t begin_pos_idx = calculate_index(begin_pregap);
+  const trk_index_t track_length_idx = calculate_index(track_length);
 
   fprintf(stderr, "===\nwrite_track: trk_i=%d, pregap=%lu, *pos=%lu\n", trk_i, pregap, *pos);
 
@@ -340,6 +344,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
 
     int pr_ret = fprintf(toc,
+      "\n"
       "// Track %d\n"
       "TRACK AUDIO\n"
       "COPY\n"
@@ -352,13 +357,15 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       "    MESSAGE \"%s\"\n"
       "  }\n"
       "}\n"
-      "FILE \"%s\" %d %d\n"
+      "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n"
       "%s\n",
       trk_i,
       title,
       performer,
       message,
-      dataname, (int)begin_pregap, (int)track_length,
+      dataname,
+      (int)begin_pos_idx.m, (int)begin_pos_idx.s, (int)begin_pos_idx.f,
+      (int)track_length_idx.m, (int)track_length_idx.s, (int)track_length_idx.f,
       pregap ? pregap_line : ""
       );
     if (0 > pr_ret) {
@@ -378,6 +385,9 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
   const size_t end = begin_pos + (silence_size_A * silence_strip_count_A * frame_size);
   const size_t track_length = end - begin_pos;
   const size_t index_entries_initial_size = 0x100U;
+
+  const trk_index_t begin_pos_idx = calculate_index(begin_pos);
+  const trk_index_t track_length_idx = calculate_index(track_length);
 
   fprintf(stderr, "===\nwrite_silence: trk_i=%d, *pos=%lu\n", trk_i, *pos);
 
@@ -492,6 +502,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
       strip_duration, strip_duration);
 
     int pr_ret = fprintf(toc,
+      "\n"
       "// Track %d\n"
       "TRACK AUDIO\n"
       "COPY\n"
@@ -504,13 +515,15 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
       "    MESSAGE \"%s\"\n"
       "  }\n"
       "}\n"
-      "FILE \"%s\" %d %d\n"
+      "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n"
       "%s\n",
       trk_i,
       title,
       performer,
       message,
-      dataname, (int)begin_pos, (int)track_length,
+      dataname,
+      (int)begin_pos_idx.m, (int)begin_pos_idx.s, (int)begin_pos_idx.f,
+      (int)track_length_idx.m, (int)track_length_idx.s, (int)track_length_idx.f,
       index_entries
       );
     if (0 > pr_ret) {
