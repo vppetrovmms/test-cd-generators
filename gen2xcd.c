@@ -20,6 +20,11 @@
 #include <math.h>
 #include <errno.h>
 
+#define CD_OK (0)
+#define CD_ERR_ARG (-1)
+#define CD_ERR_FILE (-2)
+#define CD_ERR_MEM (-3)
+
 #define CD_WARN "WARN: "
 
 typedef struct {
@@ -63,7 +68,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
 
 int main (int argc, char **argv)
 {
-  int ret = 0;
+  int ret = CD_OK;
 
   if (2 == argc)
   {
@@ -72,7 +77,7 @@ int main (int argc, char **argv)
   else
   {
     fprintf(stderr, "Incorrect arg.\nUsage: %s outbasename\n\n", argv[0]);
-    ret = -1;
+    ret = CD_ERR_ARG;
   }
 
   return ret;
@@ -119,16 +124,16 @@ int generate_image(const char *base_name)
     if (cdimg && toc) {
       ret = write_header(toc);
 
-      if (0 == ret) {
+      if (CD_OK == ret) {
         size_t trk_i = 0U;
         for (trk_i = 1; trk_i <= tracks_num; trk_i++)
         {
           ret = write_track(trk_i, (1 < trk_i ? 0U : pregap_size), &pos, cdimg, toc, cdimg_name);
-          if (0 != ret) {
+          if (CD_OK != ret) {
             break;
           }
         }
-        if (0 == ret)
+        if (CD_OK == ret)
         {
           ret = write_silence(trk_i, &pos, cdimg, toc, cdimg_name);
         }
@@ -145,7 +150,7 @@ int generate_image(const char *base_name)
   else
   {
     fprintf(stderr, "Error allocating memory\n\n");
-    ret = -12;
+    ret = CD_ERR_MEM;
   }
 
   fprintf(stderr, "\nDone.\n\n");
@@ -159,7 +164,7 @@ int generate_image(const char *base_name)
 
 int write_header(FILE *toc)
 {
-  int ret = 0;
+  int ret = CD_OK;
   const char *title = "Sixteen pure tones one octave step locked to FD";
   const char *message = "All tone frequencies are fraction of FD to avoid beating";
   const char *genre = "{ 0, 25}";
@@ -185,7 +190,7 @@ int write_header(FILE *toc)
 
   if (0 > pr_ret) {
     fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
-    ret = pr_ret;
+    ret = CD_ERR_FILE;
   }
 
   return ret;
@@ -193,7 +198,7 @@ int write_header(FILE *toc)
 
 int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname)
 {
-  int ret = 0;
+  int ret = CD_OK;
   double freq = 0.0;
   int div = 0;
   const size_t begin_pregap = *pos;
@@ -205,7 +210,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
   fprintf(stderr, "===\nwrite_track: trk_i=%d, pregap=%lu, *pos=%lu\n", trk_i, pregap, *pos);
 
   // Write a pregap if any
-  if ((0 == ret) && (0 < pregap))
+  if ((CD_OK == ret) && (0 < pregap))
   {
     const size_t sample_size = 4;
     char *pregap_buf = malloc(sample_size);
@@ -222,7 +227,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
         else
         {
           fprintf(stderr, "Write error (gap): %s!\n\n", strerror(errno));
-          ret = -1;
+          ret = CD_ERR_FILE;
           break;
         }
       }
@@ -230,13 +235,13 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     else
     {
       fprintf(stderr, "Memory allocation error(gap): %s!\n\n", strerror(errno));
-      ret = -1;
+      ret = CD_ERR_MEM;
     }
     free(pregap_buf);
   }
 
   // Write wave data
-  if (0 == ret)
+  if (CD_OK == ret)
   {
     size_t buf_len = (1 << (tracks_num - trk_i + 1));
     size_t halflen =  buf_len / 2U;
@@ -298,7 +303,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
         else
         {
           fprintf(stderr, "Write error (data): %s!\n\n", strerror(errno));
-          ret = -1;
+          ret = CD_ERR_FILE;
           break;
         }
       }
@@ -306,6 +311,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     else
     {
       fprintf(stderr, "Memory allocation error(data): %s!\n\n", strerror(errno));
+      ret = CD_ERR_MEM;
     }
 
     free(buf);
@@ -321,7 +327,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       trk_i, begin_pos, next_pos, begin_dev, next_dev, begin_frame, next_frame);
 
   // Wtite TOC entry
-  if (0 == ret)
+  if (CD_OK == ret)
   {
     char title[200];
     char message[200];
@@ -357,7 +363,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       );
     if (0 > pr_ret) {
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
-      ret = pr_ret;
+      ret = CD_ERR_FILE;
     }
   }
 
@@ -366,7 +372,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
 
 int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname)
 {
-  int ret = 0;
+  int ret = CD_OK;
   const size_t begin_pos = *pos;
   const int begin_frame = begin_pos / frame_size;
   const size_t end = begin_pos + (silence_size_A * silence_strip_count_A * frame_size);
@@ -383,11 +389,11 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
   else
   {
     fprintf(stderr, "Memory allocation error(silence): %s!\n\n", strerror(errno));
-    ret = -1;
+    ret = CD_ERR_MEM;
   }
 
   // Write wave data
-  if (0 == ret)
+  if (CD_OK == ret)
   {
     size_t buf_len = 2U;
     const size_t chunk_cnt = frame_size / buf_len;
@@ -415,7 +421,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
           else
           {
             fprintf(stderr, "Memory re-allocation error(silence): %s!\n\n", strerror(errno));
-            ret = -1;
+            ret = CD_ERR_MEM;
           }
         }
 
@@ -448,7 +454,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
             else
             {
               fprintf(stderr, "Write error (silence): %s!\n\n", strerror(errno));
-              ret = -1;
+              ret = CD_ERR_FILE;
               break;
             }
           }
@@ -458,7 +464,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
     else
     {
       fprintf(stderr, "Memory allocation error(silence): %s!\n\n", strerror(errno));
-      ret = -1;
+      ret = CD_ERR_MEM;
     }
 
     free(buf);
@@ -474,7 +480,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
       trk_i, begin_pos, next_pos, begin_dev, next_dev, begin_frame, next_frame);
 
   // Wtite TOC entry
-  if (0 == ret)
+  if (CD_OK == ret)
   {
     char title[200];
     char message[200];
@@ -509,7 +515,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
       );
     if (0 > pr_ret) {
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
-      ret = pr_ret;
+      ret = CD_ERR_FILE;
     }
   }
 
