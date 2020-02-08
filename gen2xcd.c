@@ -62,9 +62,9 @@ static const char *performer = "Tone generator";
 
 trk_index_t calculate_index(const size_t offset);
 int generate_image(const char *base_name);
-int write_header(FILE *toc);
-int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname);
-int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname);
+int write_header(FILE *toc, FILE *cue);
+int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
+int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 
 int main (int argc, char **argv)
 {
@@ -112,34 +112,39 @@ int generate_image(const char *base_name)
   size_t pos = 0;
   char *cdimg_name = malloc(strlen(base_name) + 4);
   char *toc_name = malloc(strlen(base_name) + 4);
+  char *cue_name = malloc(strlen(base_name) + 4);
   strcpy(cdimg_name, base_name);
   strcpy(toc_name, base_name);
+  strcpy(cue_name, base_name);
   strcat(cdimg_name, ".cdr");
   strcat(toc_name, ".toc");
+  strcat(cue_name, ".cue");
 
-  if ((NULL != cdimg_name) && (NULL != toc_name)) {
+  if ((NULL != cdimg_name) && (NULL != toc_name) && (NULL != cue_name)) {
     FILE *cdimg = fopen(cdimg_name, "wb");
     FILE *toc = fopen(toc_name, "wt");
+    FILE *cue = fopen(cue_name, "wt");
 
-    if (cdimg && toc) {
-      ret = write_header(toc);
+    if (cdimg && toc && cue) {
+      ret = write_header(toc, cue);
 
       if (CD_OK == ret) {
         size_t trk_i = 0U;
         for (trk_i = 1; trk_i <= tracks_num; trk_i++)
         {
-          ret = write_track(trk_i, (1 < trk_i ? 0U : pregap_size), &pos, cdimg, toc, cdimg_name);
+          ret = write_track(trk_i, (1 < trk_i ? 0U : pregap_size), &pos, cdimg, toc, cue, cdimg_name);
           if (CD_OK != ret) {
             break;
           }
         }
         if (CD_OK == ret)
         {
-          ret = write_silence(trk_i, &pos, cdimg, toc, cdimg_name);
+          ret = write_silence(trk_i, &pos, cdimg, toc, cue, cdimg_name);
         }
       }
       fclose(cdimg);
       fclose(toc);
+      fclose(cue);
     }
     else
     {
@@ -162,7 +167,7 @@ int generate_image(const char *base_name)
   return ret;
 }
 
-int write_header(FILE *toc)
+int write_header(FILE *toc, FILE *cue)
 {
   int ret = CD_OK;
   const char *title = "Sixteen pure tones one octave step locked to FD";
@@ -191,10 +196,22 @@ int write_header(FILE *toc)
     ret = CD_ERR_FILE;
   }
 
+  pr_ret = fprintf(cue,
+    "PERFORMER \"%s\"\n"
+    "TITLE \"%s\"\n",
+    performer,
+    title
+    );
+
+  if (0 > pr_ret) {
+    fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
+    ret = CD_ERR_FILE;
+  }
+
   return ret;
 }
 
-int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname)
+int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
 {
   int ret = CD_OK;
   double freq = 0.0;
@@ -209,6 +226,20 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
   const trk_index_t track_length_idx = calculate_index(track_length);
 
   fprintf(stderr, "===\nwrite_track: trk_i=%d, pregap=%lu, *pos=%lu\n", trk_i, pregap, *pos);
+
+  // Write cue wavefile
+  if (1 == trk_i)
+  {
+    int pr_ret = fprintf(cue,
+      "FILE \"%s\" WAVE\n",
+      dataname
+      );
+
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
+  }
 
   // Write a pregap if any
   if ((CD_OK == ret) && (0 < pregap))
@@ -327,7 +358,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
   fprintf(stderr, "Track %02d: Position: (c:%10lu | n:%10lu) Deviation: (c:%4d | n:%4d) Frames: (c:%7d | n:%7d)\n",
       trk_i, begin_pos, next_pos, begin_dev, next_dev, begin_frame, next_frame);
 
-  // Wtite TOC entry
+  // Wtite TOC and CUE entry
   if (CD_OK == ret)
   {
     char title[200];
@@ -340,6 +371,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     trk_index_t pre = calculate_index(pregap);
     snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
 
+    // TOC
     int pr_ret = fprintf(toc,
       "\n"
       "// Track %d\n"
@@ -369,12 +401,50 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
       ret = CD_ERR_FILE;
     }
+
+    // CUE
+    char cue_indexes[200];
+    cue_indexes[0] = 0;
+
+    trk_index_t idx00 = calculate_index(begin_pregap);
+    trk_index_t idx01 = calculate_index(begin_pos);
+
+    if (pregap)
+    {
+      snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 00 %02d:%02d:%02d\n    INDEX 01 %02d:%02d:%02d\n",
+        (int)idx00.m, (int)idx00.s, (int)idx00.f,
+        (int)idx01.m, (int)idx01.s, (int)idx01.f
+      );
+    }
+    else
+    {
+      snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 01 %02d:%02d:%02d\n",
+        (int)idx01.m, (int)idx01.s, (int)idx01.f
+      );
+    }
+
+    pr_ret = fprintf(cue,
+
+      "  TRACK %02d AUDIO\n"
+      "    TITLE \"%s\"\n"
+      "    PERFORMER \"%s\"\n"
+      "    FLAGS DCP\n"
+      "%s",
+      trk_i,
+      title,
+      performer,
+      cue_indexes
+      );
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
   }
 
   return ret;
 }
 
-int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const char *dataname)
+int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
 {
   int ret = CD_OK;
   const size_t begin_pos = *pos;
@@ -399,9 +469,21 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
     ret = CD_ERR_MEM;
   }
 
+  char *index_cue = malloc(index_entries_initial_size);
+  if (index_cue)
+  {
+    memset(index_cue, 0, index_entries_initial_size);
+  }
+  else
+  {
+    fprintf(stderr, "Memory allocation error(silence cue): %s!\n\n", strerror(errno));
+    ret = CD_ERR_MEM;
+  }
+
   // Write wave data
   if (CD_OK == ret)
   {
+    int cue_idx_i = 2;
     size_t buf_len = 2U;
     const size_t chunk_cnt = frame_size / buf_len;
     size_t bufsize = buf_len * sample_size;
@@ -409,7 +491,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
     uint8_t *buf = malloc(bufsize);
     sample_t *sam = malloc(sizeof(sample_t) * buf_len);
 
-    if (buf && sam && index_entries)
+    if (buf && sam && index_entries && index_cue)
     {
       memset(buf, 0, bufsize);
 
@@ -419,6 +501,8 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
         trk_index_t idx = calculate_index(index_pos);
         if (0U < index_pos) {
           char index[100];
+
+          // TOC
           snprintf(index, sizeof(index), "INDEX %02d:%02d:%02d\n", (int)(idx.m), (int)(idx.s), (int)(idx.f));
           index_entries = realloc(index_entries, strlen(index_entries) + strlen(index) + 1U);
           if (index_entries)
@@ -430,6 +514,21 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
             fprintf(stderr, "Memory re-allocation error(silence): %s!\n\n", strerror(errno));
             ret = CD_ERR_MEM;
           }
+
+          // CUE
+          trk_index_t idx_cue = calculate_index(*pos);
+          snprintf(index, sizeof(index), "    INDEX %02d %02d:%02d:%02d\n", cue_idx_i, (int)(idx_cue.m), (int)(idx_cue.s), (int)(idx_cue.f));
+          index_cue = realloc(index_cue, strlen(index_cue) + strlen(index) + 1U);
+          if (index_cue)
+          {
+            strcat(index_cue, index);
+          }
+          else
+          {
+            fprintf(stderr, "Memory re-allocation error(silence): %s!\n\n", strerror(errno));
+            ret = CD_ERR_MEM;
+          }
+          cue_idx_i++;
         }
 
 
@@ -486,7 +585,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
   fprintf(stderr, "Track %02d: Position: (c:%10lu | n:%10lu) Deviation: (c:%4d | n:%4d) Frames: (c:%7d | n:%7d)\n",
       trk_i, begin_pos, next_pos, begin_dev, next_dev, begin_frame, next_frame);
 
-  // Wtite TOC entry
+  // Wtite TOC and CUE entry
   if (CD_OK == ret)
   {
     char title[200];
@@ -498,6 +597,7 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
     snprintf(message, sizeof(message), "Repeating %1.1f seconds constant zero level and %1.1f seconds clapping silence",
       strip_duration, strip_duration);
 
+    // TOC
     int pr_ret = fprintf(toc,
       "\n"
       "// Track %d\n"
@@ -527,9 +627,40 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, const ch
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
       ret = CD_ERR_FILE;
     }
+
+    // CUE
+    char cue_indexes[200];
+    cue_indexes[0] = 0;
+
+    trk_index_t idx01 = calculate_index(begin_pos);
+
+    {
+      snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 01 %02d:%02d:%02d\n",
+        (int)idx01.m, (int)idx01.s, (int)idx01.f
+      );
+    }
+
+    pr_ret = fprintf(cue,
+
+      "  TRACK %02d AUDIO\n"
+      "    TITLE \"%s\"\n"
+      "    PERFORMER \"%s\"\n"
+      "    FLAGS DCP\n"
+      "%s%s",
+      trk_i,
+      title,
+      performer,
+      cue_indexes,
+      index_cue
+      );
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
   }
 
   free(index_entries);
+  free(index_cue);
 
   return ret;
 }
