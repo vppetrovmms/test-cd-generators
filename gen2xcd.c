@@ -167,7 +167,6 @@ int write_header(FILE *toc)
   int ret = CD_OK;
   const char *title = "Sixteen pure tones one octave step locked to FD";
   const char *message = "All tone frequencies are fraction of FD to avoid beating";
-  const char *genre = "{ 0, 25}";
 
   int pr_ret = fprintf(toc,
     "CD_DA\n"
@@ -180,13 +179,11 @@ int write_header(FILE *toc)
     "    TITLE \"%s\"\n"
     "    PERFORMER \"%s\"\n"
     "    MESSAGE \"%s\"\n"
-    "    GENRE \"%s\"\n"
     "  }\n"
-    "}\n\n",
+    "}\n",
     title,
     performer,
-    message,
-    genre
+    message
     );
 
   if (0 > pr_ret) {
