@@ -198,9 +198,11 @@ int write_header(FILE *toc, FILE *cue)
 
   pr_ret = fprintf(cue,
     "PERFORMER \"%s\"\n"
-    "TITLE \"%s\"\n",
+    "TITLE \"%s\"\n"
+    "REM MESSAGE \"%s\"\n",
     performer,
-    title
+    title,
+    message
     );
 
   if (0 > pr_ret) {
@@ -428,11 +430,13 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       "  TRACK %02d AUDIO\n"
       "    TITLE \"%s\"\n"
       "    PERFORMER \"%s\"\n"
+      "    REM MESSAGE \"%s\"\n"
       "    FLAGS DCP\n"
       "%s",
       trk_i,
       title,
       performer,
+      message,
       cue_indexes
       );
     if (0 > pr_ret) {
@@ -645,11 +649,13 @@ int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cu
       "  TRACK %02d AUDIO\n"
       "    TITLE \"%s\"\n"
       "    PERFORMER \"%s\"\n"
+      "    REM MESSAGE \"%s\"\n"
       "    FLAGS DCP\n"
       "%s%s",
       trk_i,
       title,
       performer,
+      message,
       cue_indexes,
       index_cue
       );
