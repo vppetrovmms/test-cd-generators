@@ -1244,7 +1244,7 @@ write_track_fm_step (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FIL
       // double freq_vals[step_num];
       snprintf (title, sizeof (title), "Repeating frequencies %.3f, %.3f, %.3f, %.3f, %.3f Hz (0 dB) Envelope %5.3f Hz",
 		freq_vals[0], freq_vals[1], freq_vals[2], freq_vals[3], freq_vals[4], freq_envelope);
-      snprintf (message, sizeof (message), "FD (%d Hz) fivided by %lu", fd, buf_len * buf_num);
+      snprintf (message, sizeof (message), "FD (%d Hz) divided by %lu", fd, buf_len * buf_num);
 
       // TOC
       int pr_ret = fprintf (toc,
