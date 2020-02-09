@@ -1262,7 +1262,7 @@ write_track_fm_step (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FIL
 	      size_t chunks_wr = fwrite (buf, bufsize, 1, cdimg);
 	      if (1 == chunks_wr)
 		{
-		  (*pos) += buf_len;
+		  (*pos) += (buf_len * buf_num);
 		}
 	      else
 		{
