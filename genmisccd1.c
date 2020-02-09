@@ -1449,6 +1449,8 @@ int write_noise(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue,
     uint8_t *buf = malloc(bufsize);
     sample_t *sam = malloc(sizeof(sample_t) * buf_len);
 
+    srandom(0xb1e27b68);
+
     if (buf && sam)
     {
       /*
