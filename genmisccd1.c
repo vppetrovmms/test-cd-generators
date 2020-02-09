@@ -148,14 +148,14 @@ generate_image (const char *base_name)
 	    {
 	      int trk_i = 1U;
 	      // White noise
-	      ret = write_noise (trk_i, &pos, cdimg, toc, cue, cdimg_name);
+	      ret = write_noise (trk_i, &pos, cdimg, toc, cue, base_name);
 	      trk_i++;
 	      // Square pulses
 	      if (CD_OK == ret)
 		{
 		  for (size_t trk_p = 1; trk_p <= track_number_pulse; trk_p++, trk_i++)
 		    {
-		      ret = write_track_square (trk_i, trk_p, &pos, cdimg, toc, cue, cdimg_name);
+		      ret = write_track_square (trk_i, trk_p, &pos, cdimg, toc, cue, base_name);
 		      if (CD_OK != ret)
 			{
 			  break;
@@ -167,7 +167,7 @@ generate_image (const char *base_name)
 		{
 		  for (size_t trk_p = 1; trk_p <= track_number_pulse; trk_p++, trk_i++)
 		    {
-		      ret = write_track_pulse (trk_i, trk_p, &pos, cdimg, toc, cue, cdimg_name);
+		      ret = write_track_pulse (trk_i, trk_p, &pos, cdimg, toc, cue, base_name);
 		      if (CD_OK != ret)
 			{
 			  break;
@@ -179,7 +179,7 @@ generate_image (const char *base_name)
 		{
 		  for (size_t trk_t = 1; trk_t <= track_number_triangle; trk_t++, trk_i++)
 		    {
-		      ret = write_track_triangle (trk_i, trk_t, &pos, cdimg, toc, cue, cdimg_name);
+		      ret = write_track_triangle (trk_i, trk_t, &pos, cdimg, toc, cue, base_name);
 		      if (CD_OK != ret)
 			{
 			  break;
@@ -203,7 +203,7 @@ generate_image (const char *base_name)
 		{
 		  for (size_t trk_t = 1; trk_t <= track_number_am; trk_t++, trk_i++)
 		    {
-		      ret = write_track_am_triangle (trk_i, trk_t, &pos, cdimg, toc, cue, cdimg_name);
+		      ret = write_track_am_triangle (trk_i, trk_t, &pos, cdimg, toc, cue, base_name);
 		      if (CD_OK != ret)
 			{
 			  break;
@@ -213,11 +213,11 @@ generate_image (const char *base_name)
 	      // FM step
 	      if (CD_OK == ret)
 		{
-		  ret = write_track_fm_step (trk_i, &pos, cdimg, toc, cue, cdimg_name);
+		  ret = write_track_fm_step (trk_i, &pos, cdimg, toc, cue, base_name);
 		}
 	      if (CD_OK == ret)
 		{
-		  ret = write_silence (trk_i, &pos, cdimg, toc, cue, cdimg_name);
+		  ret = write_silence (trk_i, &pos, cdimg, toc, cue, base_name);
 		}
 	    }
 	  fclose (cdimg);
@@ -257,7 +257,14 @@ write_header (FILE * toc, FILE * cue)
 			"\n"
 			"CD_TEXT {\n"
 			"  LANGUAGE_MAP {\n"
-			"    0: 9\n" "  }\n" "  LANGUAGE 0 {\n" "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n",
+			"    0: 9\n"
+                        "  }\n"
+                        "  LANGUAGE 0 {\n"
+                        "    TITLE \"%s\"\n"
+                        "    PERFORMER \"%s\"\n"
+                        "    MESSAGE \"%s\"\n"
+                        "  }\n"
+                        "}\n",
 			title,
 			performer,
 			message);
@@ -268,7 +275,10 @@ write_header (FILE * toc, FILE * cue)
       ret = CD_ERR_FILE;
     }
 
-  pr_ret = fprintf (cue, "PERFORMER \"%s\"\n" "TITLE \"%s\"\n" "REM MESSAGE \"%s\"\n", performer, title, message);
+  pr_ret = fprintf (cue, "PERFORMER \"%s\"\n"
+                         "TITLE \"%s\"\n"
+                         "REM MESSAGE \"%s\"\n",
+                    performer, title, message);
 
   if (0 > pr_ret)
     {
@@ -400,7 +410,12 @@ write_track_pulse (const int trk_i, const int trk_p, size_t *pos, FILE * cdimg, 
 			    "TWO_CHANNEL_AUDIO\n"
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
-			    "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+			    "    TITLE \"%s\"\n"
+                            "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -425,7 +440,11 @@ write_track_pulse (const int trk_i, const int trk_p, size_t *pos, FILE * cdimg, 
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -553,7 +572,12 @@ write_track_square (const int trk_i, const int trk_p, size_t *pos, FILE * cdimg,
 			    "TWO_CHANNEL_AUDIO\n"
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
-			    "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+			    "    TITLE \"%s\"\n"
+                            "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -578,7 +602,11 @@ write_track_square (const int trk_i, const int trk_p, size_t *pos, FILE * cdimg,
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -706,7 +734,12 @@ write_track_triangle (const int trk_i, const int trk_t, size_t *pos, FILE * cdim
 			    "TWO_CHANNEL_AUDIO\n"
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
-			    "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+			    "    TITLE \"%s\"\n"
+                            "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -731,7 +764,11 @@ write_track_triangle (const int trk_i, const int trk_t, size_t *pos, FILE * cdim
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -877,7 +914,12 @@ write_track_am_sine (const int trk_i, const int trk_am, size_t *pos, FILE * cdim
 			    "TWO_CHANNEL_AUDIO\n"
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
-			    "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+			    "    TITLE \"%s\"\n"
+                            "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -902,7 +944,11 @@ write_track_am_sine (const int trk_i, const int trk_am, size_t *pos, FILE * cdim
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -1055,7 +1101,12 @@ write_track_am_triangle (const int trk_i, const int trk_am, size_t *pos, FILE * 
 			    "TWO_CHANNEL_AUDIO\n"
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
-			    "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+			    "    TITLE \"%s\"\n"
+                            "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -1080,7 +1131,11 @@ write_track_am_triangle (const int trk_i, const int trk_am, size_t *pos, FILE * 
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -1256,7 +1311,12 @@ write_track_fm_step (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FIL
 			    "TWO_CHANNEL_AUDIO\n"
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
-			    "    TITLE \"%s\"\n" "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+			    "    TITLE \"%s\"\n"
+                            "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -1281,7 +1341,11 @@ write_track_fm_step (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FIL
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -1313,7 +1377,7 @@ write_noise (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FILE * cue,
   if (1)
     {
       int pr_ret = fprintf (cue,
-			    "FILE \"%s\" WAVE\n",
+			    "FILE \"%s.wav\" WAVE\n",
 			    dataname);
 
       if (0 > pr_ret)
@@ -1460,7 +1524,12 @@ write_noise (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FILE * cue,
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
 			    "    TITLE \"%s\"\n"
-			    "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n" "%s\n",
+			    "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n"
+                            "%s\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -1495,7 +1564,11 @@ write_noise (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FILE * cue,
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s", trk_i, title, performer, message, cue_indexes);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s",
+                        trk_i, title, performer, message, cue_indexes);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
@@ -1671,7 +1744,12 @@ write_silence (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FILE * cu
 			    "CD_TEXT {\n"
 			    "  LANGUAGE 0 {\n"
 			    "    TITLE \"%s\"\n"
-			    "    PERFORMER \"%s\"\n" "    MESSAGE \"%s\"\n" "  }\n" "}\n" "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n" "%s\n",
+			    "    PERFORMER \"%s\"\n"
+                            "    MESSAGE \"%s\"\n"
+                            "  }\n"
+                            "}\n"
+                            "FILE \"%s.wav\" %02d:%02d:%02d %02d:%02d:%02d\n"
+                            "%s\n",
 			    trk_i,
 			    title,
 			    performer,
@@ -1699,7 +1777,11 @@ write_silence (const int trk_i, size_t *pos, FILE * cdimg, FILE * toc, FILE * cu
       pr_ret = fprintf (cue,
 			"  TRACK %02d AUDIO\n"
 			"    TITLE \"%s\"\n"
-			"    PERFORMER \"%s\"\n" "    REM MESSAGE \"%s\"\n" "    FLAGS DCP\n" "%s%s", trk_i, title, performer, message, cue_indexes, index_cue);
+			"    PERFORMER \"%s\"\n"
+                        "    REM MESSAGE \"%s\"\n"
+                        "    FLAGS DCP\n"
+                        "%s%s",
+                        trk_i, title, performer, message, cue_indexes, index_cue);
       if (0 > pr_ret)
 	{
 	  fprintf (stderr, "Write error (cue): %s!\n\n", strerror (errno));
