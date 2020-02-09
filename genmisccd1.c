@@ -110,7 +110,6 @@ trk_index_t calculate_index(const size_t offset_s)
 
 int generate_image(const char *base_name)
 {
-//  const size_t pregap_size = pregap_size_A * frame_size;
   int ret = -10;
   size_t pos = 0;
   char *cdimg_name = malloc(strlen(base_name) + 4);
@@ -350,13 +349,9 @@ int write_track_pulse(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg
   {
     char title[200];
     char message[200];
-    //char pregap_line[80];
 
     snprintf(title, sizeof(title), "Pop pulses %6.2f Hz", freq);
     snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
-
-    //trk_index_t pre = calculate_index(pregap);
-    //snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
 
     // TOC
     int pr_ret = fprintf(toc,
@@ -521,13 +516,9 @@ int write_track_square(const int trk_i, const int trk_p, size_t *pos, FILE *cdim
   {
     char title[200];
     char message[200];
-    //char pregap_line[80];
 
     snprintf(title, sizeof(title), "Square pulses %6.2f Hz", freq);
     snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
-
-    //trk_index_t pre = calculate_index(pregap);
-    //snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
 
     // TOC
     int pr_ret = fprintf(toc,
@@ -631,21 +622,18 @@ int write_track_triangle(const int trk_i, const int trk_t, size_t *pos, FILE *cd
 #else
       val += (0x10000 >> (0x13 - (trk_t << 1)));
 #endif
-      //fprintf(stderr, "A trk_t=%d val=0x%04x\n", trk_t, val);
       for (size_t i = 0U; i < half_len; i++)
       {
         sam[i].s.l = (uint16_t)val;
         sam[i].s.r = (uint16_t)val;
         val += (1 << ((trk_t-1) << 1));
       }
-      //fprintf(stderr, "B trk_t=%d val=0x%04x\n", trk_t, val);
       for (size_t i = half_len; i < buf_len; i++)
       {
         val -= (1 << ((trk_t-1) << 1));
         sam[i].s.l = (uint16_t)val;
         sam[i].s.r = (uint16_t)val;
       }
-      //fprintf(stderr, "C trk_t=%d val=0x%04x\n", trk_t, val);
 
       size_t buf_pos = 0U;
 
@@ -696,13 +684,9 @@ int write_track_triangle(const int trk_i, const int trk_t, size_t *pos, FILE *cd
   {
     char title[200];
     char message[200];
-    //char pregap_line[80];
 
     snprintf(title, sizeof(title), "Triangle pulses %18.15f Hz", freq);
     snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
-
-    //trk_index_t pre = calculate_index(pregap);
-    //snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
 
     // TOC
     int pr_ret = fprintf(toc,
