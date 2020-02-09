@@ -54,18 +54,23 @@ static const int sample_size = 4;
 static const int fd = 44100;
 static const size_t frame_size = 588U;
 static const size_t silence_size_A = 2250U;
-static const size_t silence_strip_count_A = 3U; // Odd number
+static const size_t silence_strip_count_A = 5U; // Odd number
 static const char *performer = "Waveform generator";
 static const size_t track_number_pulse = 3U;
 static const size_t track_number_triangle = 5U;
+static const size_t track_number_am = 3U;
+static const size_t track_size_am = 18000U; // 9000U;
+static const size_t track_size_fm = 25000U; //5000U;
 
 trk_index_t calculate_index(const size_t offset);
 int generate_image(const char *base_name);
 int write_header(FILE *toc, FILE *cue);
-// int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 int write_track_pulse(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 int write_track_square(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 int write_track_triangle(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
+int write_track_am_sine(const int trk_i, const int trk_am, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
+int write_track_am_triangle(const int trk_i, const int trk_am, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
+int write_track_fm_step(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 int write_noise(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 int write_silence(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname);
 
@@ -168,6 +173,33 @@ int generate_image(const char *base_name)
             }
           }
         }
+        // AM sine
+        if (CD_OK == ret)
+        {
+          for (size_t trk_t = 1; trk_t <= track_number_am; trk_t++, trk_i++)
+          {
+            ret = write_track_am_sine(trk_i, trk_t, &pos, cdimg, toc, cue, cdimg_name);
+            if (CD_OK != ret) {
+              break;
+            }
+          }
+        }
+        // AM triangle
+        if (CD_OK == ret)
+        {
+          for (size_t trk_t = 1; trk_t <= track_number_am; trk_t++, trk_i++)
+          {
+            ret = write_track_am_triangle(trk_i, trk_t, &pos, cdimg, toc, cue, cdimg_name);
+            if (CD_OK != ret) {
+              break;
+            }
+          }
+        }
+        // FM step
+        if (CD_OK == ret)
+        {
+          ret = write_track_fm_step(trk_i, &pos, cdimg, toc, cue, cdimg_name);
+        }
         if (CD_OK == ret)
         {
           ret = write_silence(trk_i, &pos, cdimg, toc, cue, cdimg_name);
@@ -246,7 +278,7 @@ int write_header(FILE *toc, FILE *cue)
 
 int write_track_pulse(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
 {
-  const size_t track_size_pulse = 9000U;
+  const size_t track_size_pulse = 4500U;
   int ret = CD_OK;
   double freq = 0.0;
   int div = 0;
@@ -350,7 +382,7 @@ int write_track_pulse(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg
     char title[200];
     char message[200];
 
-    snprintf(title, sizeof(title), "Pop pulses %6.2f Hz", freq);
+    snprintf(title, sizeof(title), "Pop pulses %3.0f Hz", freq);
     snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
 
     // TOC
@@ -417,7 +449,7 @@ int write_track_pulse(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg
 
 int write_track_square(const int trk_i, const int trk_p, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
 {
-  const size_t track_size_pulse = 9000U;
+  const size_t track_size_pulse = 4500U;
   int ret = CD_OK;
   double freq = 0.0;
   int div = 0;
@@ -517,7 +549,7 @@ int write_track_square(const int trk_i, const int trk_p, size_t *pos, FILE *cdim
     char title[200];
     char message[200];
 
-    snprintf(title, sizeof(title), "Square pulses %6.2f Hz", freq);
+    snprintf(title, sizeof(title), "Square pulses %3.0f Hz", freq);
     snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
 
     // TOC
@@ -750,79 +782,43 @@ int write_track_triangle(const int trk_i, const int trk_t, size_t *pos, FILE *cd
   return ret;
 }
 
-#if 0
-int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
+int write_track_am_sine(const int trk_i, const int trk_am, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
 {
   int ret = CD_OK;
   double freq = 0.0;
+  double freq_carr = 0.0;
   int div = 0;
-  const size_t begin_pregap = *pos;
-  const size_t begin_pos = *pos + pregap;
+  const size_t begin_pos = *pos;
   const int begin_frame = begin_pos / frame_size;
-  const size_t end = begin_pos + (track_size_A * frame_size);
-  const size_t track_length = end - begin_pregap;
+  const size_t end = begin_pos + (track_size_am * frame_size);
+  const size_t track_length = end - begin_pos;
 
-  const trk_index_t begin_pos_idx = calculate_index(begin_pregap);
+  const trk_index_t begin_pos_idx = calculate_index(begin_pos);
   const trk_index_t track_length_idx = calculate_index(track_length);
 
-  fprintf(stderr, "===\nwrite_track: trk_i=%d, pregap=%lu, *pos=%lu\n", trk_i, pregap, *pos);
-
-  // Write cue wavefile
-  if (1 == trk_i)
-  {
-    int pr_ret = fprintf(cue,
-      "FILE \"%s\" WAVE\n",
-      dataname
-      );
-
-    if (0 > pr_ret) {
-      fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
-      ret = CD_ERR_FILE;
-    }
-  }
-
-  // Write a pregap if any
-  if ((CD_OK == ret) && (0 < pregap))
-  {
-    const size_t sample_size = 4;
-    char *pregap_buf = malloc(sample_size);
-    if (NULL != pregap_buf)
-    {
-      memset (pregap_buf, 0, sample_size);
-      for (size_t i = 0U; i < pregap ; i++)
-      {
-        size_t chunks_wr = fwrite(pregap_buf, sample_size, 1, cdimg);
-        if (1 == chunks_wr)
-        {
-          (*pos)++;
-        }
-        else
-        {
-          fprintf(stderr, "Write error (gap): %s!\n\n", strerror(errno));
-          ret = CD_ERR_FILE;
-          break;
-        }
-      }
-    }
-    else
-    {
-      fprintf(stderr, "Memory allocation error(gap): %s!\n\n", strerror(errno));
-      ret = CD_ERR_MEM;
-    }
-    free(pregap_buf);
-  }
+  fprintf(stderr, "===\nwrite_track: trk_i=%d, *pos=%lu\n", trk_i, *pos);
 
   // Write wave data
   if (CD_OK == ret)
   {
-    size_t buf_len = (1 << (tracks_num - trk_i + 1));
-    size_t halflen =  buf_len / 2U;
-    size_t bufsize = halflen * 2U * sample_size;
+    const size_t buf_len = 8820;// 8820 -> 15 frames -> 5Hz // (1 << (track_number_am - trk_am + 1));
+    const size_t halflen =  buf_len / 2U;
+    const size_t bufsize = halflen * 2U * sample_size;
     fprintf(stderr, "Track %02d: buf_len:%lu halflen:%lu bufsize:%lu\n", trk_i, buf_len, halflen, bufsize);
     uint8_t *buf = malloc(bufsize);
     sample_t *sam = malloc(sizeof(sample_t) * buf_len);
 
+    size_t carr_div = 30;
+    for (int am_i = 1; trk_am > am_i; am_i++)
+    {
+      carr_div *= 7;
+    }
+    const double carr_div_d = (double)carr_div;
+    const int base_i = 0x8000;
+    const double base_d = (double)base_i;
+
     freq = (double)fd / (double)buf_len;
+    freq_carr = freq * carr_div_d;
     div = (int)buf_len;
 
     if (buf && sam)
@@ -831,7 +827,404 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
 
       memset(buf, 0, bufsize);
 
-      for (size_t i = 0; i < halflen; i++)
+      for (size_t i = 0; i < buf_len; i++)
+      {
+        const double half_d = 0.5;
+        const double one_d = 1.0;
+        const double carr_dval = sin(radpos * carr_div_d);
+        const double carr_denv = (-cos(radpos) + one_d) * half_d;
+
+        double dval = carr_denv * carr_dval * (base_d - half_d);
+        int val1 = (int)(dval + base_d);
+        val1 -= base_i;
+
+        sam[i].s.l = (uint16_t)val1;
+        sam[i].s.r = (uint16_t)val1;
+
+        radpos += (M_PI / halflen);
+      }
+
+      for (size_t i = 0; i < buf_len; i++)
+      {
+        if (-1 != ((int)((int16_t)sam[i].s.l) + (int)((int16_t)sam[buf_len-i-1].s.l))) {
+          fprintf(stderr, CD_WARN "Values are not symmetrical to neutral level 0.5: i=%d val1=%5d val2=%5d\n", (int)i, (int)((int16_t)sam[i].s.l), (int)((int16_t)sam[buf_len-i-1].s.l));
+        }
+      }
+
+      size_t buf_pos = 0U;
+
+      for (size_t i = 0; i < buf_len; i++)
+      {
+        //fprintf(stderr, "i=%lu sam:%02x:%02x:%02x:%02x\n", i, (int)sam[i].r.a, (int)sam[i].r.b, (int)sam[i].r.c, (int)sam[i].r.d);
+        buf[buf_pos++] = sam[i].r.a;
+        buf[buf_pos++] = sam[i].r.b;
+        buf[buf_pos++] = sam[i].r.c;
+        buf[buf_pos++] = sam[i].r.d;
+      }
+
+      while(end > *pos)
+      {
+        size_t chunks_wr = fwrite(buf, bufsize, 1, cdimg);
+        if (1 == chunks_wr)
+        {
+          (*pos) += buf_len;
+        }
+        else
+        {
+          fprintf(stderr, "Write error (data): %s!\n\n", strerror(errno));
+          ret = CD_ERR_FILE;
+          break;
+        }
+      }
+    }
+    else
+    {
+      fprintf(stderr, "Memory allocation error(data): %s!\n\n", strerror(errno));
+      ret = CD_ERR_MEM;
+    }
+
+    free(buf);
+    free(sam);
+  }
+
+  const size_t next_pos = *pos;
+  const int next_frame = next_pos / frame_size;
+  const int begin_dev = (begin_frame * frame_size) - (int)begin_pos;
+  const int next_dev = (next_frame * frame_size) - (int)next_pos;
+
+  fprintf(stderr, "Track %02d: Position: (c:%10lu | n:%10lu) Deviation: (c:%4d | n:%4d) Frames: (c:%7d | n:%7d)\n",
+      trk_i, begin_pos, next_pos, begin_dev, next_dev, begin_frame, next_frame);
+
+  // Wtite TOC and CUE entry
+  if (CD_OK == ret)
+  {
+    char title[200];
+    char message[200];
+
+    snprintf(title, sizeof(title), "Carrier %4.0f Hz AM modulated with %1.0f Hz sine", freq_carr, freq);
+    snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
+
+    // TOC
+    int pr_ret = fprintf(toc,
+      "\n"
+      "// Track %d\n"
+      "TRACK AUDIO\n"
+      "COPY\n"
+      "NO PRE_EMPHASIS\n"
+      "TWO_CHANNEL_AUDIO\n"
+      "CD_TEXT {\n"
+      "  LANGUAGE 0 {\n"
+      "    TITLE \"%s\"\n"
+      "    PERFORMER \"%s\"\n"
+      "    MESSAGE \"%s\"\n"
+      "  }\n"
+      "}\n"
+      "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+      trk_i,
+      title,
+      performer,
+      message,
+      dataname,
+      (int)begin_pos_idx.m, (int)begin_pos_idx.s, (int)begin_pos_idx.f,
+      (int)track_length_idx.m, (int)track_length_idx.s, (int)track_length_idx.f
+      );
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
+
+    // CUE
+    char cue_indexes[200];
+    cue_indexes[0] = 0;
+
+
+    trk_index_t idx01 = calculate_index(begin_pos);
+    snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 01 %02d:%02d:%02d\n",
+      (int)idx01.m, (int)idx01.s, (int)idx01.f
+    );
+
+    pr_ret = fprintf(cue,
+
+      "  TRACK %02d AUDIO\n"
+      "    TITLE \"%s\"\n"
+      "    PERFORMER \"%s\"\n"
+      "    REM MESSAGE \"%s\"\n"
+      "    FLAGS DCP\n"
+      "%s",
+      trk_i,
+      title,
+      performer,
+      message,
+      cue_indexes
+      );
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
+  }
+
+  return ret;
+}
+
+int write_track_am_triangle(const int trk_i, const int trk_am, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
+{
+  int ret = CD_OK;
+  double freq = 0.0;
+  double freq_carr = 0.0;
+  int div = 0;
+  const size_t begin_pos = *pos;
+  const int begin_frame = begin_pos / frame_size;
+  const size_t end = begin_pos + (track_size_am * frame_size);
+  const size_t track_length = end - begin_pos;
+
+  const trk_index_t begin_pos_idx = calculate_index(begin_pos);
+  const trk_index_t track_length_idx = calculate_index(track_length);
+
+  fprintf(stderr, "===\nwrite_track: trk_i=%d, *pos=%lu\n", trk_i, *pos);
+
+  // Write wave data
+  if (CD_OK == ret)
+  {
+    const size_t buf_len = 8820;// 8820 -> 15 frames -> 5Hz
+    const size_t halflen =  buf_len / 2U;
+    const size_t bufsize = halflen * 2U * sample_size;
+    fprintf(stderr, "Track %02d: buf_len:%lu halflen:%lu bufsize:%lu\n", trk_i, buf_len, halflen, bufsize);
+    uint8_t *buf = malloc(bufsize);
+    sample_t *sam = malloc(sizeof(sample_t) * buf_len);
+
+    size_t carr_div = 30;
+    for (int am_i = 1; trk_am > am_i; am_i++)
+    {
+      carr_div *= 7;
+    }
+    const double carr_div_d = (double)carr_div;
+    const int base_i = 0x8000;
+    const double base_d = (double)base_i;
+
+    freq = (double)fd / (double)buf_len;
+    freq_carr = freq * carr_div_d;
+    div = (int)buf_len;
+
+    if (buf && sam)
+    {
+      double radpos = M_PI / halflen / 2;
+
+      memset(buf, 0, bufsize);
+
+      for (size_t i = 0; i < buf_len; i++)
+      {
+        const double half_d = 0.5;
+        const double carr_dval = sin(radpos * carr_div_d);
+        double carr_denv = 0.0;
+        if (halflen > i)
+        {
+          carr_denv = ((double)i + half_d) / (double)halflen;
+        }
+        else
+        {
+          carr_denv = ((double)(buf_len-i-1) + half_d) / (double)halflen;
+        }
+
+        double dval = carr_denv * carr_dval * (base_d - half_d);
+        int val1 = (int)(dval + base_d);
+        val1 -= base_i;
+
+        sam[i].s.l = (uint16_t)val1;
+        sam[i].s.r = (uint16_t)val1;
+
+        radpos += (M_PI / halflen);
+      }
+
+      for (size_t i = 0; i < buf_len; i++)
+      {
+        if (-1 != ((int)((int16_t)sam[i].s.l) + (int)((int16_t)sam[buf_len-i-1].s.l))) {
+          fprintf(stderr, CD_WARN "Values are not symmetrical to neutral level 0.5: i=%d val1=%5d val2=%5d\n", (int)i, (int)((int16_t)sam[i].s.l), (int)((int16_t)sam[buf_len-i-1].s.l));
+        }
+      }
+
+      size_t buf_pos = 0U;
+
+      for (size_t i = 0; i < buf_len; i++)
+      {
+        //fprintf(stderr, "i=%lu sam:%02x:%02x:%02x:%02x\n", i, (int)sam[i].r.a, (int)sam[i].r.b, (int)sam[i].r.c, (int)sam[i].r.d);
+        buf[buf_pos++] = sam[i].r.a;
+        buf[buf_pos++] = sam[i].r.b;
+        buf[buf_pos++] = sam[i].r.c;
+        buf[buf_pos++] = sam[i].r.d;
+      }
+
+      while(end > *pos)
+      {
+        size_t chunks_wr = fwrite(buf, bufsize, 1, cdimg);
+        if (1 == chunks_wr)
+        {
+          (*pos) += buf_len;
+        }
+        else
+        {
+          fprintf(stderr, "Write error (data): %s!\n\n", strerror(errno));
+          ret = CD_ERR_FILE;
+          break;
+        }
+      }
+    }
+    else
+    {
+      fprintf(stderr, "Memory allocation error(data): %s!\n\n", strerror(errno));
+      ret = CD_ERR_MEM;
+    }
+
+    free(buf);
+    free(sam);
+  }
+
+  const size_t next_pos = *pos;
+  const int next_frame = next_pos / frame_size;
+  const int begin_dev = (begin_frame * frame_size) - (int)begin_pos;
+  const int next_dev = (next_frame * frame_size) - (int)next_pos;
+
+  fprintf(stderr, "Track %02d: Position: (c:%10lu | n:%10lu) Deviation: (c:%4d | n:%4d) Frames: (c:%7d | n:%7d)\n",
+      trk_i, begin_pos, next_pos, begin_dev, next_dev, begin_frame, next_frame);
+
+  // Wtite TOC and CUE entry
+  if (CD_OK == ret)
+  {
+    char title[200];
+    char message[200];
+
+    snprintf(title, sizeof(title), "Carrier %4.0f Hz AM modulated with %1.0f Hz triangle", freq_carr, freq);
+    snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
+
+    // TOC
+    int pr_ret = fprintf(toc,
+      "\n"
+      "// Track %d\n"
+      "TRACK AUDIO\n"
+      "COPY\n"
+      "NO PRE_EMPHASIS\n"
+      "TWO_CHANNEL_AUDIO\n"
+      "CD_TEXT {\n"
+      "  LANGUAGE 0 {\n"
+      "    TITLE \"%s\"\n"
+      "    PERFORMER \"%s\"\n"
+      "    MESSAGE \"%s\"\n"
+      "  }\n"
+      "}\n"
+      "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
+      trk_i,
+      title,
+      performer,
+      message,
+      dataname,
+      (int)begin_pos_idx.m, (int)begin_pos_idx.s, (int)begin_pos_idx.f,
+      (int)track_length_idx.m, (int)track_length_idx.s, (int)track_length_idx.f
+      );
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
+
+    // CUE
+    char cue_indexes[200];
+    cue_indexes[0] = 0;
+
+
+    trk_index_t idx01 = calculate_index(begin_pos);
+    snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 01 %02d:%02d:%02d\n",
+      (int)idx01.m, (int)idx01.s, (int)idx01.f
+    );
+
+    pr_ret = fprintf(cue,
+
+      "  TRACK %02d AUDIO\n"
+      "    TITLE \"%s\"\n"
+      "    PERFORMER \"%s\"\n"
+      "    REM MESSAGE \"%s\"\n"
+      "    FLAGS DCP\n"
+      "%s",
+      trk_i,
+      title,
+      performer,
+      message,
+      cue_indexes
+      );
+    if (0 > pr_ret) {
+      fprintf(stderr, "Write error (cue): %s!\n\n", strerror(errno));
+      ret = CD_ERR_FILE;
+    }
+  }
+
+  return ret;
+}
+
+int write_track_fm_step(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
+{
+  int ret = CD_OK;
+  const size_t begin_pos = *pos;
+  const int begin_frame = begin_pos / frame_size;
+  const size_t end = begin_pos + (track_size_fm * frame_size);
+  const size_t track_length = end - begin_pos;
+  const size_t buf_len = 2500U;
+  const size_t step_num = 5U;
+  const size_t step_ratio = 5U;
+  const size_t buf_num = (step_num - 1U) * 2U;
+  double freq_vals[step_num];
+  double freq_envelope = 0.0;
+
+  const trk_index_t begin_pos_idx = calculate_index(begin_pos);
+  const trk_index_t track_length_idx = calculate_index(track_length);
+
+  memset(freq_vals, 0, sizeof(freq_vals));
+
+  fprintf(stderr, "===\nwrite_track: trk_i=%d, *pos=%lu\n", trk_i, *pos);
+
+  // Write wave data
+  if (CD_OK == ret)
+  {
+    size_t buf_ratio[buf_num];
+    const size_t bufsize = buf_len * sample_size * buf_num;
+    fprintf(stderr, "Track %02d: buf_len:%lu bufsize:%lu buf_num:%lu\n", trk_i, buf_len, bufsize, buf_num);
+    uint8_t *buf = malloc(bufsize);
+    sample_t *sam = malloc(sizeof(sample_t) * buf_len * buf_num);
+
+    if (buf && sam)
+    {
+      size_t i = 0;
+
+      memset(buf, 0, bufsize);
+      memset(sam, 0, sizeof(sample_t) * buf_len * buf_num);
+
+      size_t ri = 0U;
+      size_t r = 1U;
+      for(;step_num > ri; ri++)
+      {
+        freq_vals[ri] = (double)fd / (double)buf_len * (double)r;
+        buf_ratio[ri] = r;
+        r *= step_ratio;
+      }
+      r /= step_ratio;
+      for(;buf_num > ri; ri++)
+      {
+        r /= step_ratio;
+        buf_ratio[ri] = r;
+      }
+      freq_envelope = (double)fd / (double)buf_len / (double)buf_num;
+
+
+
+      for (size_t buf_i = 0U; buf_num > buf_i; buf_i++)
+      {
+      size_t br = buf_ratio[buf_i];
+
+      for (size_t peri=0; br > peri; peri++)
+      {
+      size_t halflen =  buf_len / br / 2U;
+      double radpos = M_PI / (double)halflen / 2.0;
+
+
+      // fprintf(stderr, CD_WARN "buf_i=%lu br=%lu freq=%f radpos=%f halflen=%lu peri=%lu\n", buf_i, br, freq, radpos, halflen, peri);
+
+      for (size_t wave_i = 0; wave_i < halflen; i++, wave_i++)
       {
         const int base_i = 0x8000;
         const double base_d = (double)base_i;
@@ -854,9 +1247,17 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
         radpos += (M_PI / halflen);
       }
 
+      i += halflen;
+
+      }
+
+      }
+
+
+
       size_t buf_pos = 0U;
 
-      for (size_t i = 0; i < buf_len; i++)
+      for (size_t i = 0; i < buf_len * buf_num; i++)
       {
         // fprintf(stderr, "i=%lu sam:%02x:%02x:%02x:%02x\n", i, (int)sam[i].r.a, (int)sam[i].r.b, (int)sam[i].r.c, (int)sam[i].r.d);
         buf[buf_pos++] = sam[i].r.a;
@@ -889,7 +1290,7 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     free(buf);
     free(sam);
   }
-  
+
   const size_t next_pos = *pos;
   const int next_frame = next_pos / frame_size;
   const int begin_dev = (begin_frame * frame_size) - (int)begin_pos;
@@ -903,13 +1304,17 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
   {
     char title[200];
     char message[200];
-    char pregap_line[80];
 
-    snprintf(title, sizeof(title), "Tone %21.15f Hz (0 dB)", freq);
-    snprintf(message, sizeof(message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double)fd / freq)) ? "" : " (Frequency outside filter range)");
-
-    trk_index_t pre = calculate_index(pregap);
-    snprintf(pregap_line, sizeof(pregap_line), "START %02d:%02d:%02d\n", (int)pre.m, (int)pre.s, (int)pre.f);
+    // double freq_vals[step_num];
+    snprintf(title, sizeof(title), "Repeating frequencies %.3f, %.3f, %.3f, %.3f, %.3f Hz (0 dB) Envelope %5.3f Hz",
+      freq_vals[0],
+      freq_vals[1],
+      freq_vals[2],
+      freq_vals[3],
+      freq_vals[4],
+      freq_envelope
+      );
+    snprintf(message, sizeof(message), "FD (%d Hz) fivided by %lu", fd, buf_len * buf_num);
 
     // TOC
     int pr_ret = fprintf(toc,
@@ -926,16 +1331,14 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
       "    MESSAGE \"%s\"\n"
       "  }\n"
       "}\n"
-      "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n"
-      "%s\n",
+      "FILE \"%s\" %02d:%02d:%02d %02d:%02d:%02d\n",
       trk_i,
       title,
       performer,
       message,
       dataname,
       (int)begin_pos_idx.m, (int)begin_pos_idx.s, (int)begin_pos_idx.f,
-      (int)track_length_idx.m, (int)track_length_idx.s, (int)track_length_idx.f,
-      pregap ? pregap_line : ""
+      (int)track_length_idx.m, (int)track_length_idx.s, (int)track_length_idx.f
       );
     if (0 > pr_ret) {
       fprintf(stderr, "Write error (toc): %s!\n\n", strerror(errno));
@@ -946,22 +1349,11 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
     char cue_indexes[200];
     cue_indexes[0] = 0;
 
-    trk_index_t idx00 = calculate_index(begin_pregap);
     trk_index_t idx01 = calculate_index(begin_pos);
 
-    if (pregap)
-    {
-      snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 00 %02d:%02d:%02d\n    INDEX 01 %02d:%02d:%02d\n",
-        (int)idx00.m, (int)idx00.s, (int)idx00.f,
-        (int)idx01.m, (int)idx01.s, (int)idx01.f
-      );
-    }
-    else
-    {
-      snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 01 %02d:%02d:%02d\n",
-        (int)idx01.m, (int)idx01.s, (int)idx01.f
-      );
-    }
+    snprintf(cue_indexes, sizeof(cue_indexes), "    INDEX 01 %02d:%02d:%02d\n",
+      (int)idx01.m, (int)idx01.s, (int)idx01.f
+    );
 
     pr_ret = fprintf(cue,
 
@@ -985,12 +1377,11 @@ int write_track(const int trk_i, const size_t pregap, size_t *pos, FILE *cdimg, 
 
   return ret;
 }
-#endif
 
 int write_noise(const int trk_i, size_t *pos, FILE *cdimg, FILE *toc, FILE *cue, const char *dataname)
 {
   const size_t pregap = 2940U;
-  const size_t track_size_noise = 45000U;
+  const size_t track_size_noise = 22500U;
   int ret = CD_OK;
   const size_t begin_pregap = *pos;
   const size_t begin_pos = *pos + pregap;
