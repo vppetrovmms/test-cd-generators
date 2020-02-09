@@ -373,7 +373,7 @@ write_track (const int trk_i, const size_t pregap, size_t *pos, FILE * cdimg, FI
       char message[200];
       char pregap_line[80];
 
-      snprintf (title, sizeof (title), "Tone %10.5f Hz (0 dB)", freq);
+      snprintf (title, sizeof (title), "Tone %8.3f Hz (0 dB)", freq);
       snprintf (message, sizeof (message), "FD (%d Hz) divided by %2d%s", fd, div, (2.01 < ((double) fd / freq)) ? "" : " (Frequency outside filter range)");
 
       trk_index_t pre = calculate_index (pregap);
