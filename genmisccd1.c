@@ -191,7 +191,7 @@ generate_image (const char *base_name)
 		{
 		  for (size_t trk_t = 1; trk_t <= track_number_am; trk_t++, trk_i++)
 		    {
-		      ret = write_track_am_sine (trk_i, trk_t, &pos, cdimg, toc, cue, cdimg_name);
+		      ret = write_track_am_sine (trk_i, trk_t, &pos, cdimg, toc, cue, base_name);
 		      if (CD_OK != ret)
 			{
 			  break;
