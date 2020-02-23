@@ -217,6 +217,7 @@ generate_image (const char *base_name)
 		}
 	      if (CD_OK == ret)
 		{
+		  trk_i++;
 		  ret = write_silence (trk_i, &pos, cdimg, toc, cue, base_name);
 		}
 	    }
